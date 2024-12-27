@@ -1,0 +1,444 @@
+﻿Міністерство освіти і науки України
+Харківський національний університет радіоелектроніки
+
+
+
+
+Кафедра програмної інженерії
+
+
+
+
+Звіт з лабораторної роботи № 4
+з дисципліни «Аналіз та рефакторинг коду»
+на тему «Розробка IoT-клієнта
+(бізнес-логіки та функцій налаштування)»
+
+
+
+
+Виконав
+студент групи ПЗПІ-22-7
+	
+
+Березін Павло Павлович
+	
+
+Перевірив
+ст. викладач кафедри ПІ
+	
+
+
+
+Сокорчук Ігор Петрович
+	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Харків, 2024
+4.1 Мета роботи
+
+
+Розробити програмне забезпечення для IoT або SmartDevice пристрою, створеного на базі будь-якої поширеної на сьогодні платформи, придатної для реалізації вбудованих систем.
+
+
+4.2 Хід роботи
+4.2.1 Опис інженерних рішень
+
+
+        Архітектура IoT-клієнта побудована на основі модульного підходу, що дозволяє розподіляти функціональність між окремими компонентами. Основними складовими є графічний інтерфейс користувача, симулятор даних сенсорів та протокол клієнт-серверної взаємодії. Графічний інтерфейс відповідає за зручну взаємодію з користувачем, дозволяє налаштовувати параметри, такі як формат дати, часова зона та система мір, а також управляти симуляцією і відслідковувати аварійні стани. Симулятор даних генерує випадкові показники сенсорів, включаючи температуру, вологість, вагу і стан ліфта. Протокол взаємодії з сервером використовує REST API, побудований на бібліотеці requests, забезпечуючи передачу даних у реальному часі.
+IoT-клієнт взаємодіє із сервером через REST API, дотримуючись стандартів передачі даних. Використовується формат JSON, що забезпечує універсальність і зручність. Перед відправкою дані проходять валідацію для гарантії їхньої коректності. Для взаємодії застосовуються стандартні HTTP-методи, зокрема POST для надсилання даних.
+Бізнес-логіка IoT-клієнта включає математичну обробку даних для аналізу стану ліфта та генерації критичних подій. Показники сенсорів: температура, вологість і вага — аналізуються на відповідність встановленим порогам. У разі перевищення цих значень або виявлення аварійного стану генерується подія типу critical, тоді як у штатному режимі створюються події normal.
+Особливу увагу приділено обробці аварійних станів. Наприклад, у разі відсутності живлення показники сенсорів припиняють оновлюватися, а у логах фіксується відповідна подія. Якщо ліфт застрягає, його рух припиняється, а стан відмічається як аварійний. У разі перевищення ваги надсилається сигнал на сервер для реєстрації події.
+Функції налаштування включають підтримку локалізації з двома мовами: англійською та українською. Інтерфейсні тексти зберігаються у словнику. Формат дати й часу та система мір можна налаштовувати відповідно до локальних потреб.
+Інженерні підходи реалізовані через модульність структури, обробку винятків та тестованість компонентів. Логіка програми розділена на модулі, такі як ui, sensors, protocols, та localization, що полегшує її розширення й підтримку. Обробка винятків забезпечує стабільну роботу навіть у разі помилок користувача або проблем із з’єднанням. Розробка здійснювалась із врахуванням можливості модульного тестування.
+Запропоновані рішення мають низку переваг. Зручний інтерфейс спрощує використання, гнучкість дозволяє змінювати налаштування без модифікації коду, а масштабованість забезпечує легке додавання нових функцій. Завдяки обробці винятків і перевірці даних клієнт характеризується високою стабільністю.
+
+
+4.2.2 UML-діаграми
+  
+
+Рисунок 4.1 — UML-діаграма прецедентів ІоТ клієнта
+
+
+  
+
+Рисунок 4.2 — UML-діаграма діяльності ІоТ-клієнта
+
+
+
+
+4.3 Висновки
+        Під час виконання лабораторної роботи було розроблено IoT-клієнт з імітацією праці ліфтів та пов’язаних з ними датчиків. Прийняті рішення забезпечують відповідність сучасним вимогам до IoT-клієнтів і дозволяють легко інтегрувати пристрій у більші програмні системи.
+        Посилання на відеопрезентацію: https://youtu.be/l0HFPXS7NbI 
+Посилання на Github-репозиторій: 
+https://github.com/NureBerezinPavlo/arkpz-pzpi-22-7-berezin-pavlo/tree/main/Task4 
+
+
+
+
+ДОДАТОК А
+Фрагмент коду, пов’язаного з бізнес-логікою IoT-клієнта
+
+
+ 1. import random
+ 2. from datetime import datetime
+ 3. from .settings import SETTINGS, UNIT_SYSTEMS
+ 4.
+ 5. class SensorSimulator:
+ 6.         def __init__(self):
+ 7.             self.temperature = 25.0
+ 8.             self.humidity = 50.0
+ 9.             self.weight = 0.0
+10.             self.current_floor = 1
+11.             self.is_power_on = True
+12.             self.is_moving = False
+13.             self.is_stuck = False
+14.             self.tempetature_min = -0.5
+15.             self.temperature_max = 0.5
+16.             self.humidity_min = -1.0
+17.             self.humidity_max = 1.0
+18.
+19.         def update_simulation_params(self, tempetature_min, temperature_max,
+20.                                      humidity_min, humidity_max, weight):
+21.             """Оновлення параметрів симуляції."""
+22.             self.tempetature_min = tempetature_min
+23.             self.temperature_max = temperature_max
+24.             self.humidity_min = humidity_min
+25.             self.humidity_max = humidity_max
+26.             self.weight = weight
+27.
+28.         def generate_data(self):
+29.             """Генерує випадкові дані для сенсорів"""
+30.             unit_system = UNIT_SYSTEMS[SETTINGS['unit_system']]
+31.             date_format = SETTINGS['date_format']
+32.
+33.             if self.is_power_on:
+34.                 self.temperature += random.uniform(self.tempetature_min, self.temperature_max)
+35.                 self.humidity += random.uniform(self.humidity_min, self.humidity_max)
+36.                 self.humidity = min(self.humidity, 100)
+37.
+38.                 if self.is_moving and not self.is_stuck:
+39.                     self.current_floor += 1 if random.random() > 0.5 else -1
+40.                     self.current_floor = max(1, self.current_floor)
+41.
+42.                 return {
+43.                     "temperature": round(self.temperature, 2),
+44.                     "humidity": round(self.humidity, 2),
+45.                     "weight": round(self.weight, 2),
+46.                     "timestamp": datetime.now().strftime(date_format),
+47.                     "current_floor": self.current_floor,
+48.                     "is_moving": self.is_moving,
+49.                     "is_power_on": self.is_power_on,
+50.                     "is_stuck": self.is_stuck
+51.                 }
+52.             else:
+53.                 return {
+54.                     "timestamp": datetime.now().strftime(date_format),
+55.                     "is_stuck": self.is_moving,
+56.                     "is_power_on": self.is_power_on,
+57.                     "is_moving": False
+58.                 }
+
+
+
+
+ДОДАТОК Б
+Фрагмент коду, пов’язаного з налаштуванням IoT-клієнта
+
+
+  1. import tkinter as tk
+  2. from tkinter import ttk
+  3. from .sensors import SensorSimulator
+  4. from .protocols import ServerClient
+  5. from .localization import LANGUAGES
+  6. from .settings import SETTINGS, UNIT_SYSTEMS
+  7.
+  8. class IoTClientApp:
+  9.         def __init__(self, root):
+ 10.             self.root = root
+ 11.             self.language = 'en'  # За замовчуванням — англійська
+ 12.             self.texts = LANGUAGES[self.language]
+ 13.
+ 14.             self.root.title(self.texts['title'])
+ 15.             self.simulator = SensorSimulator()
+ 16.             self.client = ServerClient("http://127.0.0.1:5000")
+ 17.
+ 18.             self.setup_ui()
+ 19.
+ 20.         def switch_language(self, lang):
+ 21.             """Перемикання мови інтерфейсу"""
+ 22.             self.language = lang
+ 23.             self.texts = LANGUAGES[self.language]
+ 24.             self.refresh_ui()
+ 25.
+ 26.         def refresh_ui(self):
+ 27.             """Оновлює текст інтерфейсу для поточної мови"""
+ 28.             self.root.title(self.texts['title'])
+ 29.             self.server_url_label.config(text=self.texts['server_url'])
+ 30.             self.elevator_id_label.config(text=self.texts['elevator_id'])
+ 31.             self.start_button.config(text=self.texts['start_simulation'])
+ 32.             self.stop_button.config(text=self.texts['stop_simulation'])
+ 33.             #self.control_panel_label.config(text=self.texts['control_panel'])
+ 34.             self.power_button.config(text=self.texts['toggle_power'])
+ 35.             self.stuck_button.config(text=self.texts['toggle_stuck'])
+ 36.             self.move_button.config(text=self.texts['toggle_move'])
+ 37.             self.settings_label.config(text=self.texts['settings'])
+ 38.             self.date_format_label.config(text=self.texts['date_format'])
+ 39.             self.time_zone_label.config(text=self.texts['time_zone'])
+ 40.             self.unit_system_label.config(text=self.texts['unit_system'])
+ 41.             self.save_settings_button.config(text=self.texts['save_settings'])
+ 42.             self.temp_min_label.config(text=self.texts['temperature_min'])
+ 43.             self.temp_max_label.config(text=self.texts['temperature_max'])
+ 44.             self.hum_min_label.config(text=self.texts['humidity_min'])
+ 45.             self.hum_max_label.config(text=self.texts['humidity_max'])
+ 46.             self.fixed_weight_label.config(text=self.texts['weight'])
+ 47.
+ 48.         def setup_ui(self):
+ 49.             """Налаштування графічного інтерфейсу"""
+ 50.             frame = ttk.Frame(self.root, padding=10)
+ 51.             frame.grid(row=0, column=0, sticky=(tk.W, tk.E))
+ 52.
+ 53.             # Вибір мови
+ 54.             language_frame = ttk.Frame(frame)
+ 55.             language_frame.grid(row=0, column=0, sticky=tk.W, columnspan=2)
+ 56.             ttk.Button(language_frame, text="EN", command=lambda: self.switch_language('en')).grid(row=0, column=0, padx=5)
+ 57.             ttk.Button(language_frame, text="UK", command=lambda: self.switch_language('uk')).grid(row=0, column=1, padx=5)
+ 58.
+ 59.             # Поле введення URL сервера
+ 60.             self.server_url_label = ttk.Label(frame, text=self.texts['server_url'])
+ 61.             self.server_url_label.grid(row=1, column=0, sticky=tk.W)
+ 62.             self.url_entry = ttk.Entry(frame, width=40)
+ 63.             self.url_entry.insert(0, "http://127.0.0.1:5000")
+ 64.             self.url_entry.grid(row=1, column=1, sticky=tk.W)
+ 65.
+ 66.             # Поле введення Elevator ID
+ 67.             self.elevator_id_label = ttk.Label(frame, text=self.texts['elevator_id'])
+ 68.             self.elevator_id_label.grid(row=2, column=0, sticky=tk.W)
+ 69.             self.elevator_id_entry = ttk.Entry(frame, width=10)
+ 70.             self.elevator_id_entry.grid(row=2, column=1, sticky=tk.W)
+ 71.
+ 72.             # Налаштування
+ 73.             self.settings_label = ttk.Label(frame, text=self.texts['settings'])
+ 74.             self.settings_label.grid(row=3, column=0, sticky=tk.W)
+ 75.
+ 76.             # Вибір формату дати
+ 77.             self.date_format_label = ttk.Label(frame, text=self.texts['date_format'])
+ 78.             self.date_format_label.grid(row=4, column=0, sticky=tk.W)
+ 79.             self.date_format_entry = ttk.Entry(frame, width=20)
+ 80.             self.date_format_entry.insert(0, SETTINGS['date_format'])
+ 81.             self.date_format_entry.grid(row=4, column=1, sticky=tk.W)
+ 82.
+ 83.             # Вибір часової зони
+ 84.             self.time_zone_label = ttk.Label(frame, text=self.texts['time_zone'])
+ 85.             self.time_zone_label.grid(row=5, column=0, sticky=tk.W)
+ 86.             self.time_zone_var = tk.StringVar(value=SETTINGS['time_zone'])
+ 87.             ttk.OptionMenu(frame, self.time_zone_var, SETTINGS['time_zone'], "local", "UTC").grid(row=5, column=1, sticky=tk.W)
+ 88.
+ 89.             # Вибір системи мір
+ 90.             self.unit_system_label = ttk.Label(frame, text=self.texts['unit_system'])
+ 91.             self.unit_system_label.grid(row=6, column=0, sticky=tk.W)
+ 92.             self.unit_system_var = tk.StringVar(value=SETTINGS['unit_system'])
+ 93.             ttk.OptionMenu(frame, self.unit_system_var, SETTINGS['unit_system'], "metric", "imperial").grid(row=6, column=1, sticky=tk.W)
+ 94.
+ 95.             # Кнопка для збереження налаштувань
+ 96.             self.save_settings_button = ttk.Button(frame, text=self.texts['save_settings'], command=self.save_settings)
+ 97.             self.save_settings_button.grid(row=7, column=1, sticky=tk.E, pady=5)
+ 98.
+ 99.             # Кнопка для запуску симуляції
+100.             self.start_button = ttk.Button(frame, text=self.texts['start_simulation'], command=self.start_simulation)
+101.             self.start_button.grid(row=8, column=0, sticky=tk.W)
+102.
+103.             # Кнопка для зупинки симуляції
+104.             self.stop_button = ttk.Button(frame, text=self.texts['stop_simulation'], command=self.stop_simulation, state=tk.DISABLED)
+105.             self.stop_button.grid(row=8, column=1, sticky=tk.W)
+106.
+107.             # Фрейм для кнопок
+108.             control_buttons_frame = ttk.Frame(frame)
+109.             control_buttons_frame.grid(row=10, column=0, columnspan=3, sticky=(tk.W, tk.E))
+110.
+111.             # Кнопки управління аварійними ситуаціями
+112.             self.power_button = ttk.Button(control_buttons_frame, text=self.texts['toggle_power'], command=self.toggle_power)
+113.             self.power_button.grid(row=0, column=0, padx=5, pady=2)
+114.
+115.             self.stuck_button = ttk.Button(control_buttons_frame, text=self.texts['toggle_stuck'], command=self.toggle_stuck)
+116.             self.stuck_button.grid(row=0, column=1, padx=5, pady=2)
+117.
+118.             self.move_button = ttk.Button(control_buttons_frame, text=self.texts['toggle_move'], command=self.toggle_move)
+119.             self.move_button.grid(row=0, column=2, padx=5, pady=2)
+120.
+121.             # Розтягування кнопок по горизонталі
+122.             control_buttons_frame.columnconfigure(0, weight=1)
+123.             control_buttons_frame.columnconfigure(1, weight=1)
+124.             control_buttons_frame.columnconfigure(2, weight=1)
+125.
+126.             # Поля для налаштування параметрів генерації
+127.             self.temp_min_label = ttk.Label(frame, text=self.texts['temperature_min'])
+128.             self.temp_min_label.grid(row=11, column=0, sticky=tk.W)
+129.             self.temp_min_entry = ttk.Entry(frame, width=10)
+130.             self.temp_min_entry.insert(0, "-0.5")
+131.             self.temp_min_entry.grid(row=11, column=1, sticky=tk.W)
+132.
+133.             self.temp_max_label = ttk.Label(frame, text=self.texts['temperature_max'])
+134.             self.temp_max_label.grid(row=11, column=2, sticky=tk.W)
+135.             self.temp_max_entry = ttk.Entry(frame, width=10)
+136.             self.temp_max_entry.insert(0, "0.5")
+137.             self.temp_max_entry.grid(row=11, column=3, sticky=tk.W)
+138.
+139.             self.hum_min_label = ttk.Label(frame, text=self.texts['humidity_min'])
+140.             self.hum_min_label.grid(row=12, column=0, sticky=tk.W)
+141.             self.hum_min_entry = ttk.Entry(frame, width=10)
+142.             self.hum_min_entry.insert(0, "-1.0")
+143.             self.hum_min_entry.grid(row=12, column=1, sticky=tk.W)
+144.
+145.             self.hum_max_label = ttk.Label(frame, text=self.texts['humidity_max'])
+146.             self.hum_max_label.grid(row=12, column=2, sticky=tk.W)
+147.             self.hum_max_entry = ttk.Entry(frame, width=10)
+148.             self.hum_max_entry.insert(0, "1.0")
+149.             self.hum_max_entry.grid(row=12, column=3, sticky=tk.W)
+150.
+151.             self.fixed_weight_label = ttk.Label(frame, text=self.texts['weight'])
+152.             self.fixed_weight_label.grid(row=13, column=0, sticky=tk.W)
+153.             self.fixed_weight_entry = ttk.Entry(frame, width=10)
+154.             self.fixed_weight_entry.insert(0, "0.0")
+155.             self.fixed_weight_entry.grid(row=13, column=1, sticky=tk.W)
+156.
+157.             self.apply_simulation_params_button = ttk.Button(frame, text=self.texts['apply_simulation_params'],
+158.                                                              command=self.apply_simulation_params)
+159.             self.apply_simulation_params_button.grid(row=14, column=2, sticky=tk.W)
+160.
+161.             # Поле для виводу відправлених даних
+162.             self.log_text = tk.Text(self.root, height=15, width=60, state=tk.DISABLED)
+163.             self.log_text.grid(row=15, column=0, columnspan=2, padx=10, pady=10)
+164.
+165.         def save_settings(self):
+166.             """Зберігає налаштування"""
+167.             SETTINGS['date_format'] = self.date_format_entry.get()
+168.             SETTINGS['time_zone'] = self.time_zone_var.get()
+169.             SETTINGS['unit_system'] = self.unit_system_var.get()
+170.             self.log(f"Settings updated: {SETTINGS}")
+171.
+172.         def log(self, message):
+173.             """Додає повідомлення до логів"""
+174.             self.log_text.config(state=tk.NORMAL)
+175.             self.log_text.insert(tk.END, f"{message}\n")
+176.             self.log_text.config(state=tk.DISABLED)
+177.             self.log_text.see(tk.END)
+178.
+179.         def start_simulation(self):
+180.             """Запуск симуляції роботи сенсорів"""
+181.             self.simulating = True
+182.             self.client.base_url = self.url_entry.get()
+183.             self.log(self.texts['simulation_started'])
+184.             self.start_button.config(state=tk.DISABLED)
+185.             self.stop_button.config(state=tk.NORMAL)
+186.             self.simulate()
+187.
+188.         def stop_simulation(self):
+189.             """Зупинка симуляції роботи сенсорів"""
+190.             self.simulating = False
+191.             self.log(self.texts['simulation_stopped'])
+192.             self.start_button.config(state=tk.NORMAL)
+193.             self.stop_button.config(state=tk.DISABLED)
+194.
+195.         def simulate(self):
+196.             """Симуляція даних сенсорів і відправка їх на сервер"""
+197.             if self.simulating:
+198.                 data = self.simulator.generate_data()
+199.
+200.                 # Отримати elevator_id з інтерфейсу
+201.                 try:
+202.                     elevator_id = int(self.elevator_id_entry.get())
+203.                     data["elevator_id"] = elevator_id
+204.                 except ValueError:
+205.                     self.log(self.texts['invalid_elevator_id'])
+206.                     self.stop_simulation()
+207.                     return
+208.
+209.                 # Конвертація одиниць вимірювання для виводу
+210.                 if "temperature" in data and "humidity" in data and "weight" in data:
+211.                     converted_data = {
+212.                         "temperature": f"{round(data['temperature'] * 9/5 + 32, 2)} °F" if SETTINGS['unit_system'] == "imperial" else f"{data['temperature']} °C",
+213.                         "humidity": f"{data['humidity']} %",
+214.                         "weight": f"{round(data['weight'] * 2.20462, 2)} lbs" if SETTINGS['unit_system'] == "imperial" else f"{data['weight']} kg",
+215.                         "timestamp": data["timestamp"],
+216.                         "current_floor": data["current_floor"],
+217.                         "is_moving": data["is_moving"],
+218.                         "is_power_on": data["is_power_on"],
+219.                         "is_stuck": data["is_stuck"],
+220.                     }
+221.                     self.log(f"{self.texts['sent']}: {converted_data}")
+222.                 else:
+223.                     minimal_data = {
+224.                         "timestamp": data["timestamp"],
+225.                         "is_power_on": data["is_power_on"],
+226.                         "is_moving": data["is_moving"],
+227.                         "is_stuck": data["is_stuck"],
+228.                     }
+229.                     self.log(f"{self.texts['sent']}: {minimal_data}")
+230.                 # Надсилання даних
+231.                 response = self.client.send_sensor_data(data)
+232.                 self.log(f"{self.texts['response']}: {response}")
+233.                 self.root.after(1000, self.simulate) # Повторювати кожну секунду
+234.
+235.         def log(self, message):
+236.             """Додає повідомлення до логів"""
+237.             self.log_text.config(state=tk.NORMAL)
+238.             self.log_text.insert(tk.END, f"{message}\n")
+239.             self.log_text.config(state=tk.DISABLED)
+240.             self.log_text.see(tk.END)
+241.
+242.         def toggle_power(self):
+243.             """Перемикає стан живлення"""
+244.             self.simulator.is_power_on = not self.simulator.is_power_on
+245.             state = self.texts['state_on'] if self.simulator.is_power_on else self.texts['state_off']
+246.             self.log(self.texts['power_toggled'].format(state=state))
+247.
+248.         def toggle_stuck(self):
+249.             """Перемикає стан застрягання"""
+250.             self.simulator.is_stuck = not self.simulator.is_stuck
+251.             state = self.texts['state_stuck'] if self.simulator.is_stuck else self.texts['state_moving_normally']
+252.             self.log(self.texts['stuck_toggled'].format(state=state))
+253.
+254.         def toggle_move(self):
+255.             """Перемикає стан руху"""
+256.             self.simulator.is_moving = not self.simulator.is_moving
+257.             state = self.texts['state_moving'] if self.simulator.is_moving else self.texts['state_stopped']
+258.             self.log(self.texts['movement_toggled'].format(state=state))
+259.
+260.         def apply_simulation_params(self):
+261.             """Застосовує нові параметри генерації"""
+262.             try:
+263.                 temperature_min = float(self.temperature_min_entry.get())
+264.                 temperature_max = float(self.temperature_max_entry.get())
+265.                 humidity_min = float(self.humidity_min_entry.get())
+266.                 humidity_max = float(self.humidity_max_entry.get())
+267.                 fixed_weight = float(self.fixed_weight_entry.get())
+268.
+269.                 self.simulator.update_simulation_params(temperature_min,
+270.                                                         temperature_max,
+271.                                                         humidity_min,
+272.                                                         humidity_max,
+273.                                                         fixed_weight)
+274.                 self.log("Simulation parameters updated successfully.")
+275.             except ValueError:
+276.                 self.log("Error: Invalid simulation parameter input.")
+277.
+278. if __name__ == "__main__":
+279.         root = tk.Tk()
+280.         app = IoTClientApp(root)
+281.         root.mainloop()
